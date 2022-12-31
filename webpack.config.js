@@ -8,6 +8,7 @@ module.exports = {
   devServer: {
     static: './dist',
   },
+    experiments:{syncWebAssembly: true},
   plugins: [
     new HtmlWebpackPlugin({
       title: 'Dev',
@@ -20,6 +21,10 @@ module.exports = {
         test: /\.tsx?$/,
         use: 'ts-loader',
         exclude: /node_modules/,
+      },
+      {
+        test: /\.wasm$/,
+        type: 'webassembly/sync'
       },
     ],
   },
