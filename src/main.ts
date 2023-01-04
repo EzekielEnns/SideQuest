@@ -24,7 +24,6 @@ let prevTime = performance.now();
 
 //controls 
 const velocity = new THREE.Vector3();
-const direction = new THREE.Vector3();
 const controls = new PointerLockControls(camera,document.body);
 let moveForward = false;
 let moveBackward = false;
@@ -126,6 +125,7 @@ let colDesc = R.ColliderDesc.cuboid(cSize/2, cSize/2, cSize/2)
 world.createCollider(colDesc,ridgeBody)
 ridgeBody.resetForces(true);
 
+
 //world Vector 
 const dir = new Vector3(0.0,0.0,0.0)
 let ray:Ray;
@@ -134,6 +134,16 @@ let rayD = {
         y:camera.getWorldDirection(dir).y,
         z:camera.getWorldDirection(dir).z
 }
+
+let playerBody = R.RigidBodyDesc.dynamic()
+                    .setLinearDamping(2.0)
+                    .setAngularDamping(2.0)
+                    .setTranslation(camera.position.x, camera.position.y, camera.position.z)
+                    .setAdditionalMass(100.0)
+let playerCol = R.ColliderDesc.cuboid(1, 1, 1)
+let player = world.createRigidBody(playerBody)
+world.createCollider(playerCol,player)
+
 
 //raycasting 
 document.addEventListener('mousedown', function(e){
@@ -157,9 +167,10 @@ renderer.render( scene, camera );
     const time = performance.now();
     //movment 
     if(controls.isLocked){
-        const moveSpeed = 200.0;
+        const moveSpeed = 25.0;
         const jumpheight = 150.0;
         const delta = ( time - prevTime ) / 1000;
+        /*
         velocity.x -= velocity.x * 10.0 * delta;
         velocity.z -= velocity.z * 10.0 * delta;
         velocity.y -= 9.8 * jumpheight * delta;
@@ -169,16 +180,36 @@ renderer.render( scene, camera );
         direction.normalize(); 
         if ( moveForward || moveBackward ) velocity.z -= direction.z * moveSpeed * delta;
         if ( moveLeft || moveRight ) velocity.x -= direction.x * moveSpeed * delta;
+
         controls.moveRight( - velocity.x * delta );
         controls.moveForward( - velocity.z * delta );
         controls.getObject().position.y += ( velocity.y * delta );
+        //deal with jummping 
         if ( controls.getObject().position.y < 1 ) {
             velocity.y = 0;
             controls.getObject().position.y = 1;
             canJump = true;
         }
+        */
+       //note grid is reverse 
+       let rotate = controls.getObject().rotation;
+       const direction = new THREE.Vector3();
+       direction.z = -1*(Number( moveForward ) - Number( moveBackward ))*moveSpeed;
+       direction.x = (Number( moveRight ) - Number( moveLeft ))*moveSpeed;
+       direction.applyEuler(rotate)
+       direction.multiplyScalar(2) //movement speed 
+        
+       //so apply impulse actually results in a floaty effect 
+       //not really good for clear fine movment 
+       //but jumping feels amazing 
+       player.setNextKinematicTranslation({x:direction.x,y:0.0,z:direction.z })
+       player.applyImpulse({x:direction.x,y:0.0,z:direction.z }, true)
+       let rlPos = player.translation();
+       controls.getObject().position.set(rlPos.x,rlPos.y,rlPos.z)
+      console.log(direction)
     }
-    
+
+
     //shots fired 
     if(ray){
         let hit = world.castRay(ray, 200, true);
