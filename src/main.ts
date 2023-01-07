@@ -1,5 +1,5 @@
 //https://threejs.org/docs/index.html#manual/en/introduction/How-to-run-things-locally
-import {Collider, ColliderDesc, Ray, RayColliderToi, RigidBody, RigidBodyDesc} from '@dimforge/rapier3d';
+import {Collider, ColliderDesc, RigidBody, RigidBodyDesc} from '@dimforge/rapier3d';
 import * as THREE from 'three';
 import {BufferGeometry, Camera, CircleGeometry, Euler, Line, LineBasicMaterial, Mesh, MeshBasicMaterial, Vector3} from 'three';
 import {PointerLockControls} from 'three/examples/jsm/controls/PointerLockControls'
@@ -38,9 +38,9 @@ let gravity = {x:0.0, y:-9.81, z:0.0}
 let world = new R.World(gravity)
 let groundColDesc = R.ColliderDesc.cuboid(50.0, 0.1, 50.0)
                       .setFriction(0.6)
+                      .setTranslation(0,0,0)
 world.createCollider(groundColDesc)
 
-interface bVec {x:number,y:number,z:number}
 class Entity{
     public threeHost:Mesh|Camera
     public body:RigidBody
@@ -67,13 +67,13 @@ class Entity{
 }
 
 ///meshes
-const cSize = 2;
+const cSize = 3;
 
 const boxyBoi = new Entity(
     new Vector3(0,5,-10),
     new THREE.Mesh(
         new THREE.BoxGeometry( cSize, cSize, cSize ),
-        new THREE.MeshBasicMaterial( { color: 0xff0000, wireframe: false} )
+        new THREE.MeshBasicMaterial( { color: 0xff0000, wireframe: true} )
     ),
     R.RigidBodyDesc.dynamic()
             .setAdditionalMass(100.0),
@@ -94,58 +94,54 @@ const player = new Entity(
 //world Vector 
 //TODO make the vector roate with player
 //
-const lineEnd = new Mesh(new THREE.BoxGeometry(1,1,1),new MeshBasicMaterial({color:0xff00ff,wireframe:true}))
-scene.add(lineEnd)
+const circleGeometry = new THREE.CircleGeometry(1, 2);
+const circleMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00, wireframe:true });
+const circle = new THREE.Mesh(circleGeometry, circleMaterial);
+scene.add(circle)
 document.addEventListener('mousedown', function(e){
 
-    let origin:{x:number,y:number,z:number}= player.getPos().clone();
+    let pl = player.getPos().clone();
     let dir = new Vector3();
     player.threeHost.getWorldDirection(dir);
-    let realD:{x:number,y:number,z:number}= dir.clone()
-    let ray = new R.Ray(origin,realD)  
 
-    const distance = 5;
+    const distance = 3;
     let pos = new Vector3();
     pos.copy(dir);
+    //TODO for some reason needs to be roated as well 
     pos.multiplyScalar(distance)
-    lineEnd.position.set(pos.x,pos.y,pos.z)
+    pos.add(pl);
+    circle.position.set(pos.x,pos.y,pos.z)
+    circle.setRotationFromEuler(player.threeHost.rotation)
+    dir.applyEuler(player.threeHost.rotation)
 
-    //TODO set dir to player look
-    //sets ray center of screen 
-    //TODO add is lock option
-    /*
-    dir.multiplyScalar(-1)
-    if (line instanceof Line){
-        scene.remove(line)
-    }
-    let  end = orign.clone();
-    end.addScaledVector(new Vector3(0,0,1), 10)
-    let realRot = player.threeHost.rotation.clone();
-    realRot.set(-1*realRot.x, -1*realRot.y, -1*realRot.z)
-    end.applyEuler(realRot)
-    line  = new Line(lineGeo,material)
-    if (line instanceof Line){
-        console.log('origin:',orign,'end:',end )
-        console.log('rotation:',player.threeHost.rotation,'world dir :',dir)
-        scene.add(line)
-    }
-    if (lineEnd instanceof Mesh){
-    lineEnd.position.set(end.x,end.y,end.z)
-        scene.add(lineEnd)
+    let ray = new R.Ray(pos,dir)  
+    let hit = world.castRay(ray, 100, false)
+    if(hit){
+        console.log('body:',boxyBoi.body.handle,'hit:',hit.collider.handle)
+        let body = hit.collider.parent()
+        if (body){
+            if(body.handle == player.body.handle){
+                console.log(
+                    'plcolider:',player.collider.translation(),
+                    '\nplBody:',player.body.translation(),
+                    '\nplCam:',player.threeHost.position,
+                    '\npoint:',ray.pointAt(hit.toi),
+                    '\ntoi:',hit.toi
+                )
+            }
+            body.applyImpulse( {x:0.0,y:500.0,z:0.0}, true)
+
+        }
     }
 
-    //Next thing to take on shoots fired 
-    */
+
 
     /*
     console.log('origin:',player.getPos(),' dir:',dir )
     let ray = new R.Ray({x:Px,y:Py,z:Pz},dir)
     let hit = player.collider.castRay(ray, 200, true);
     if(hit == boxyBoi.body.handle){
-        boxyBoi.body.applyImpulse(
-                {x:0.0,y:500.0,z:0.0},
-        true)
-        }
+        boxyBoi.body        }
         */
 }
 )
@@ -216,6 +212,7 @@ renderer.render( scene, camera );
         world.step()
         const moveSpeed = 100.0;
         let dir = new Vector3(
+            //if we should be moving right set to 1 else set it to -1 
             (Number( moveRight ) - Number( moveLeft )),
             0,
             (Number( moveBackward ) - Number( moveForward ))
