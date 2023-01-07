@@ -94,7 +94,7 @@ const player = new Entity(
 //world Vector 
 //TODO make the vector roate with player
 //
-const lineEnd = new Mesh(new CircleGeometry(1,1,1),new MeshBasicMaterial({color:0xff00ff,wireframe:true}))
+const lineEnd = new Mesh(new THREE.BoxGeometry(1,1,1),new MeshBasicMaterial({color:0xff00ff,wireframe:true}))
 scene.add(lineEnd)
 document.addEventListener('mousedown', function(e){
 
@@ -109,7 +109,6 @@ document.addEventListener('mousedown', function(e){
     pos.copy(dir);
     pos.multiplyScalar(distance)
     lineEnd.position.set(pos.x,pos.y,pos.z)
-    lineEnd.setRotationFromEuler(player.threeHost.rotation)
 
     //TODO set dir to player look
     //sets ray center of screen 
@@ -213,21 +212,19 @@ renderer.render( scene, camera );
 ( function anim () {
 	requestAnimationFrame( anim );
 
-    world.step()//keep out of is locked TODO find out 
     if(controls.isLocked){
-       //TODO move this to movemnt function
-       const moveSpeed = 10.0;
-       let rotate = controls.getObject().rotation;
-       const direction = new THREE.Vector3();
-       
-       direction.z = -1*(Number( moveForward ) - Number( moveBackward ))*moveSpeed;
-       direction.x = (Number( moveRight ) - Number( moveLeft ))*moveSpeed;
-       direction.applyEuler(rotate)
-       direction.multiplyScalar(moveSpeed) 
-       player.body.applyImpulse({x:direction.x,y:0.0,z:direction.z }, true)
-
-       player.getPos();
-       boxyBoi.getPos();
+        world.step()
+        const moveSpeed = 100.0;
+        let dir = new Vector3(
+            (Number( moveRight ) - Number( moveLeft )),
+            0,
+            (Number( moveBackward ) - Number( moveForward ))
+        );
+        dir.applyEuler(player.threeHost.rotation)
+        dir.multiplyScalar(moveSpeed)
+        player.body.applyImpulse({x:dir.x,y:0,z:dir.z}, true)
+        player.getPos();
+        boxyBoi.getPos();
     }
 
 
