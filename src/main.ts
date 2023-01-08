@@ -103,7 +103,6 @@ const player = new Entity(
     controls.getObject(),
     R.RigidBodyDesc.dynamic()
             .setLinearDamping(1.0)
-            //.setAngularDamping(11.0)
             .setAdditionalMass(300.0),
             
     R.ColliderDesc.cuboid(1, 1, 1)
@@ -146,7 +145,6 @@ document.addEventListener('keydown', function ({code}){
         case 'KeyW':
             moveForward = true;
             break;
-
         case 'ArrowLeft':
         case 'KeyA':
             moveLeft = true;
@@ -165,12 +163,10 @@ document.addEventListener('keydown', function ({code}){
             //TODO cast
             applyToPlayer(new Vector3(0,1000,0))
             break;
-
     }
 })
 document.addEventListener('keyup', function({code}){
     switch ( code ) {
-
         case 'ArrowUp':
         case 'KeyW':
             moveForward = false;
@@ -198,20 +194,21 @@ renderer.render( scene, camera );
 
 ( function gameLoop () {
 	requestAnimationFrame( gameLoop );
-
+    
     if(controls.isLocked){
-        world.step()
-        const moveSpeed = 55.5;
+        world.step()//TODO find out how world step works in 
+        const moveSpeed = 100;
         let dir = new Vector3(
-            //if we should be moving right set to 1 else set it to -1 
             (Number( moveRight ) - Number( moveLeft )),
-            0,
+            0.0,
             (Number( moveBackward ) - Number( moveForward ))
         );
         dir.multiplyScalar(moveSpeed)
-        applyToPlayer(new Vector3(dir.x,0,dir.z))
+        applyToPlayer(new Vector3(dir.x,0.0,dir.z))
+        world.step()
         player.getPos();
         boxyBoi.getPos();
+        player.body.resetForces(true)
     }
 
 
