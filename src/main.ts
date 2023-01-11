@@ -57,7 +57,6 @@ scene.add( gridHelper );
 let gravity = {x:0.0, y:-9.81, z:0.0}
 let world = new R.World(gravity)
 let groundColDesc = R.ColliderDesc.cuboid(50.0, 0.1, 50.0)
-                      .setFriction(0.6)
                       .setTranslation(0,0,0)
 world.createCollider(groundColDesc)
 
@@ -102,14 +101,13 @@ const player = new Entity(
     new Vector3(0,1,0),
     controls.getObject(),
     R.RigidBodyDesc.dynamic()
-            .setLinearDamping(1.0)
-            .setAdditionalMass(300.0),
-            
+            .setAdditionalMass(10.0),
     R.ColliderDesc.cuboid(1, 1, 1)
 );
 
 //Shooting / effects 
 document.addEventListener('mousedown', function(e){
+
     let origin = player.getPos();
     let dir = new Vector3();
     player.threeHost.getWorldDirection(dir);
@@ -161,7 +159,7 @@ document.addEventListener('keydown', function ({code}){
             break;
         case 'Space':
             //TODO cast
-            applyToPlayer(new Vector3(0,1000,0))
+            applyToPlayer(new Vector3(0,100,0))
             break;
     }
 })
@@ -191,24 +189,31 @@ document.addEventListener('keyup', function({code}){
 
 //inital render 
 renderer.render( scene, camera );
-
+let clock = new THREE.Clock();
 ( function gameLoop () {
 	requestAnimationFrame( gameLoop );
     
     if(controls.isLocked){
-        world.step()//TODO find out how world step works in 
-        const moveSpeed = 100;
+        const moveSpeed = 5;
         let dir = new Vector3(
             (Number( moveRight ) - Number( moveLeft )),
             0.0,
             (Number( moveBackward ) - Number( moveForward ))
         );
         dir.multiplyScalar(moveSpeed)
-        applyToPlayer(new Vector3(dir.x,0.0,dir.z))
-        world.step()
+
+        dir.applyEuler(player.threeHost.rotation)
+        dir.setY(0)
+        let elapsed = clock.getDelta()
+        dir.multiplyScalar(elapsed);
+        //TODO clean up this garbage 
+        dir.add(player.getPos())
+        player.body.setTranslation(dir,true)
         player.getPos();
+        //change how this updates
         boxyBoi.getPos();
-        player.body.resetForces(true)
+
+        world.step();
     }
 
 
