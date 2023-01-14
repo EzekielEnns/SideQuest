@@ -50,6 +50,7 @@ crossHair.style.position = 'absolute'
 crossHair.style.fontSize = '1.4em'
 document.body.appendChild(crossHair)
 
+
 //world plame
 const gridHelper = new THREE.GridHelper( 100, 100 );
 gridHelper.position.y = 0;
@@ -262,16 +263,14 @@ function addMovementAndUpdateImpulse(moveSpeed:number){
         (Number( moveBackward ) - Number( moveForward ))
     );
     dir.multiplyScalar(moveSpeed)
-
-    applyToPlayerSelf(new Vector3(dir.x,0.0,dir.y))
-    player.updatePos(dir)
+    dir.applyEuler(player.threeHost.rotation)
+    player.body.applyImpulse({x:dir.x,y:0,z:dir.z}, true)
+    player.getPos();
 }
 
 //effects 
 
 let last = performance.now();
-let frameCount = 0;
-let frameRate = 0;
 
 //inital render 
 renderer.render( scene, camera );
@@ -280,12 +279,6 @@ renderer.render( scene, camera );
 	requestAnimationFrame( gameLoop );
     
     if(controls.isLocked){
-        let current = performance.now();
-        let elapsed = current - last
-        last = current;
-        frameCount++;
-        frameRate = 1000/elapsed;
-
         const moveSpeed = 5;
 
         effects.forEach((e,p)=>{
@@ -315,22 +308,3 @@ renderer.render( scene, camera );
 
 })
 
-/* spell cirlces?
-    const shape = new THREE.Shape();
-    shape.moveTo(0, 10);
-    shape.absarc(0, 0, 1, 0, Math.PI * 2, false);
-    const circleGeometry = new THREE.ShapeGeometry(shape);
-    const circleMaterial = new THREE.LineBasicMaterial({color:0xfffff00})
-    const circle = new THREE.Line(circleGeometry, circleMaterial);
-    scene.add(circle)
-
-    //in function
-    //draw circle
-    const distance = 3;
-    let pos = new Vector3();
-    pos.copy(dir);
-    pos.multiplyScalar(distance);
-    pos.add(origin);
-    circle.position.set(pos.x,pos.y,pos.z);
-    circle.setRotationFromEuler(player.threeHost.rotation);
-*/
