@@ -1,8 +1,11 @@
 //https://threejs.org/docs/index.html#manual/en/introduction/How-to-run-things-locally
-import {Collider, ColliderDesc, RayColliderToi, Ray, RigidBody, RigidBodyDesc} from '@dimforge/rapier3d';
+import {Collider, ColliderDesc, RayColliderToi, Ray, Vector,RigidBody, RigidBodyDesc, Shape} from '@dimforge/rapier3d';
 import * as THREE from 'three';
-import {BufferGeometry, Camera,  Mesh, MeshBasicMaterial, Vector, Vector3} from 'three';
+import {BufferGeometry, Camera,  Mesh, MeshBasicMaterial, Vector3} from 'three';
 import {PointerLockControls} from 'three/examples/jsm/controls/PointerLockControls'
+import {Line2} from 'three/examples/jsm/lines/Line2';
+import {LineGeometry} from 'three/examples/jsm/lines/LineGeometry';
+import {LineMaterial} from 'three/examples/jsm/lines/LineMaterial';
 
 import('@dimforge/rapier3d').then(R=> {
 
@@ -63,7 +66,7 @@ class Entity{
     public body:RigidBody
     public collider:Collider
     private pos:Vector3
-    private effect:Vector3[] = [];
+    private effect:Effect[] = [];
     
     constructor(pos:Vector3,host:Mesh|Camera,bodyDesc:RigidBodyDesc,collDesc:ColliderDesc) {
         this.pos = pos
@@ -87,11 +90,10 @@ class Entity{
         player.body.setTranslation(v,true)
         return this.getPos();
     }
-    public addImpulse(f:Vector3){ this.effect.push(f) }
-    public applyImpulses(){
-        this.effect.forEach((f)=>{
-            this.body.applyImpulse(f, true)
-        })
+
+    public addEffect(e:Effect){ this.effect.push(e)}
+    public applyEffects(){
+        this.effect.forEach((e)=>e.onHit(this))
         this.effect = [];
     }
 }
@@ -101,7 +103,7 @@ const boxyBoi = new Entity(
     new Vector3(0,5,-10),
     new THREE.Mesh(
         new THREE.BoxGeometry( cSize, cSize, cSize ),
-        new THREE.MeshBasicMaterial( { color: 0xff0000, wireframe: false} )
+        new THREE.MeshBasicMaterial( { color: 0xff0000, wireframe:true} )
     ),
     R.RigidBodyDesc.dynamic()
             .setAdditionalMass(10.0),
@@ -115,32 +117,64 @@ const player = new Entity(
     R.ColliderDesc.cuboid(1, 1, 1)
 );
 
+const getEffectMesh =()=>( new THREE.Mesh( 
+        new THREE.BoxGeometry( 10,10,10 ),
+        new THREE.MeshBasicMaterial( { color: 0x0000FF, wireframe:true} )
+))
+
 //this is to make our effects thread safe 
 const entites:Map<number,Entity> = new Map();
 entites.set(player.collider.handle,player)
 entites.set(boxyBoi.collider.handle,boxyBoi)
 
+interface Effect{
+    shape:Shape,
+    life:number,
+    onHit:(e:Entity)=>void
+}
+
+const getWind = ():Effect => ({
+    shape:new R.Cuboid(5,5,5),
+    life:10,
+    onHit:(e:Entity)=>{
+        //alert(`${e.body.handle}`)
+        e.body.applyImpulse({x:0,y:5,z:0}, true)
+    }
+});
+
+//const effects
+const effects:Map<Vector,Effect> = new Map();
+
+const rot = { w: 1.0, x: 0.0, y: 0.0, z: 0.0 };
+//line basics 
+const rayMaterial = new THREE.LineBasicMaterial( { color: 0x00FA9A, linewidth: 5, } );
+const rayGeo = new THREE.BufferGeometry();
+const rayLine = new THREE.Line(rayGeo,rayMaterial);
 //Shooting / effects 
 document.addEventListener('mousedown', function(e){
+    scene.remove(rayLine)
     //shooting ray
     let origin = player.getPos();
     let dir = new Vector3();
     player.threeHost.getWorldDirection(dir);
     let ray = new R.Ray(origin,dir)  
+    let toi= 100
+    let hit = world.castRay(ray, toi, true,undefined,undefined,undefined,player.body)
 
-    let hit = world.castRay(ray, 100, true,undefined,undefined,undefined,player.body)
-    if(!hit)return
-    let rot ={ w: 1.0, x: 0.0, y: 0.0, z: 0.0 }; 
-    let pos = ray.pointAt(hit.toi)
-    let shape = new R.Cuboid(10.0, 10.0, 10.0)
-
-    function area(c:Collider):boolean{
-        let test = entites.get(c.handle);
-        if(test){ test.addImpulse(new Vector3(0,100,0)) }
-        return true;
+    if(hit){
+        let pos = ray.pointAt(hit.toi)
+        rayGeo.setFromPoints([origin,new Vector3(pos.x,pos.y,pos.z)])
+        effects.set(pos, getWind())
     }
-    world.intersectionsWithShape(pos, rot, shape,area)
-    
+    else{
+        let pos = new Vector3();
+        pos.add(dir);
+        pos.multiplyScalar(toi);
+        pos.add(origin);
+        rayGeo.setFromPoints([origin,new Vector3(pos.x,pos.y,pos.z)])
+        effects.set(pos, getWind())
+    }
+    scene.add(rayLine)
 })
 
 /* Applys a force rotated based on where the player is looking 
@@ -177,7 +211,7 @@ document.addEventListener('keydown', function ({code}){
             moveRight = true;
             break;
         case 'Space':
-            applyToPlayerSelf(new Vector3(0,100,0))
+            player.body.applyImpulse({x:0,y:100,z:0}, true)
             break;
     }
 })
@@ -221,8 +255,23 @@ function addMovementAndUpdate(moveSpeed:number){
     player.updatePos(dir)
 }
 
+function addMovementAndUpdateImpulse(moveSpeed:number){
+    let dir = new Vector3(
+        (Number( moveRight ) - Number( moveLeft )),
+        0.0,
+        (Number( moveBackward ) - Number( moveForward ))
+    );
+    dir.multiplyScalar(moveSpeed)
+
+    applyToPlayerSelf(new Vector3(dir.x,0.0,dir.y))
+    player.updatePos(dir)
+}
+
 //effects 
 
+let last = performance.now();
+let frameCount = 0;
+let frameRate = 0;
 
 //inital render 
 renderer.render( scene, camera );
@@ -231,8 +280,29 @@ renderer.render( scene, camera );
 	requestAnimationFrame( gameLoop );
     
     if(controls.isLocked){
+        let current = performance.now();
+        let elapsed = current - last
+        last = current;
+        frameCount++;
+        frameRate = 1000/elapsed;
+
         const moveSpeed = 5;
-        entites.forEach((e)=> e.applyImpulses())
+
+        effects.forEach((e,p)=>{
+            world.intersectionsWithShape(p, rot, e.shape,(c:Collider)=>{
+                if (e.life){
+                    let mesh = getEffectMesh();
+                    mesh.position.set(p.x,p.y,p.z);
+                    scene.add(mesh)
+                }
+                e.life = 0;
+                let test = entites.get(c.handle);
+                if(test){ test.addEffect(e) }
+                return true;
+            })
+        })
+        
+        entites.forEach((daddy)=>daddy.applyEffects())
         addMovementAndUpdate(moveSpeed)
         boxyBoi.getPos();
         world.step();
@@ -244,7 +314,6 @@ renderer.render( scene, camera );
 } )();
 
 })
-
 
 /* spell cirlces?
     const shape = new THREE.Shape();
